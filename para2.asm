@@ -35,7 +35,7 @@ start: ;initialise game states
   jmp main
 
 initialise_game: ;use this for any initial conditions or loading assets in memory on loading the game(e.g. pallets, graphics etc...)
-  jsr initialise_background ;under background.asm
+  jsr load_background ;under background.asm
   rts
 
 custom_irq: ;game loop
@@ -44,7 +44,8 @@ custom_irq: ;game loop
   bne @update
   lda VERA_isr
   and #$02
-  lda @line
+  bne @line
+  jmp @done
   @update: ;place per frame operations in here
     jsr scroll_background_left ;under background.asm
     jmp @done
@@ -72,6 +73,9 @@ initialise_vera:
   lda VERA_L1_config
   ora #VERA_L1_COLOR_DEPTH_MASK
   sta VERA_L1_config
+  lda VERA_L1_tilebase
+  ora #$03
+  sta VERA_L1_tilebase
   rts
 
 initialise_interupts: ;overwrite the defaut irq handler vector with a vector to custom irq handler
@@ -85,3 +89,8 @@ initialise_interupts: ;overwrite the defaut irq handler vector with a vector to 
   lda #>custom_irq
   sta IRQVec + 1
   rts
+
+test_sprite:
+  .include "test_sprite.inc"
+palette:
+  .include "palette.inc"

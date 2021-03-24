@@ -53,6 +53,14 @@ scroll_background_left:
   cmp #30
   bne @done
   stz scroll_counter
+  lda #<test_sprite
+  sta ZP_PTR_1
+  lda #>test_sprite
+  sta ZP_PTR_1+1
+  lda #8
+  sta ZP_PTR_2
+  lda #8
+  sta ZP_PTR_3
   jsr scroll_4bpp_pixel_line_left
   jsr load_test_sprite
   @done:

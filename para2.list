@@ -297,7 +297,7 @@ Current file: para2.asm
 00080D  1               .segment "ONCE"
 00080D  1               .segment "CODE"
 00080D  1               
-00080D  1  4C 1D 09       jmp start
+00080D  1  4C 0D 09       jmp start
 000810  1               
 000810  1               
 000810  1               
@@ -314,6 +314,20 @@ Current file: para2.asm
 000813  1               
 000813  1               .include "background.asm"
 000813  2               .include "scroll.asm"
+000813  3               .macro _scroll_tile_left tile_addr, tile_width, tile_height, pixel_size
+000813  3                 lda #<tile_addr
+000813  3                 sta ZP_PTR_1
+000813  3                 lda #>tile_addr
+000813  3                 sta ZP_PTR_1+1
+000813  3                 lda #tile_width/2
+000813  3                 sta ZP_PTR_2
+000813  3                 lda #tile_height
+000813  3                 sta ZP_PTR_3
+000813  3                 lda #pixel_size
+000813  3                 sta ZP_PTR_4
+000813  3                 jsr scroll_tile_left
+000813  3               .endmacro
+000813  3               
 000813  3               
 000813  3               scroll_shift_left: ;ZP_PTR_1 set to first pixel of line, x to length of line (1 indexed)
 000813  3  18             clc
@@ -332,8 +346,8 @@ Current file: para2.asm
 000823  3  D0 F7            bne @loop
 000825  3  60             rts
 000826  3               
-000826  3               scroll_4bpp_pixel_line_left: ;ZP_PTR_2 equals line length
-000826  3  A0 04          ldy #4
+000826  3               scroll_pixel_line_left: ;ZP_PTR_2 equals line length
+000826  3  A4 26          ldy ZP_PTR_4
 000828  3                 @loop:
 000828  3  5A               phy
 000829  3  A6 22            ldx ZP_PTR_2
@@ -343,229 +357,214 @@ Current file: para2.asm
 000830  3  D0 F6            bne @loop
 000832  3  60             rts
 000833  3               
-000833  3               scroll_4bpp_tile_left:
-000833  3  A9 00          lda #0 ;initalise a and y
-000835  3  A0 00          ldy #0
-000837  3                 @loop:
-000837  3  48               pha ;push to stack so a and y can be used for the line scroll loop
-000838  3  5A               phy
-000839  3  20 26 08         jsr scroll_4bpp_pixel_line_left
-00083C  3  7A               ply
-00083D  3  68               pla
-00083E  3  18               clc
-00083F  3  69 08            adc #8
-000841  3  18 65 00 85      add_a_to_16_value ZP_PTR_1 ;macro adds a to a 16 value
-000845  3  00 A9 00 65  
-000849  3  01 85 01     
-00084C  3  69 08            adc #8
-00084E  3  18 65 22 85      add_a_to_16_value ZP_PTR_2                                  ;in this case the pixel line address (we want to jump 8 bytes each loop)
-000852  3  22 A9 00 65  
-000856  3  23 85 23     
-000859  3  C8               iny
-00085A  3  C0 10            cpy #16 ; finish after 16 rows.
-00085C  3  D0 D9            bne @loop
-00085E  3  60             rts
-00085F  3               
-00085F  2               
-00085F  2               load_palette:
-00085F  2  A9 11 8D 22    VERA_SET_ADDR $1FA00, 1
-000863  2  9F A9 FA 8D  
-000867  2  21 9F A9 00  
-00086E  2  A9 15 85 00    store_16_value ZP_PTR_1, palette
-000872  2  A9 0A 85 01  
-000876  2  A0 00          ldy #0
-000878  2                 @loop:
-000878  2  B1 00            lda (ZP_PTR_1),y
-00087A  2  8D 23 9F         sta VERA_data0
-00087D  2  18 A5 00 69      add_16_value ZP_PTR_1 ,1
-000881  2  01 85 00 A5  
-000885  2  01 69 00 85  
-00088A  2  A5 01 C9 0A      compare_16_value ZP_PTR_1, (palette + 64), @loop
-00088E  2  D0 E8 A5 00  
-000892  2  C9 55 D0 E2  
-000896  2  60             rts
-000897  2               
-000897  2               load_test_sprite:
-000897  2  A9 10 8D 22    VERA_SET_ADDR $F800,1
-00089B  2  9F A9 F8 8D  
-00089F  2  21 9F A9 00  
-0008A6  2  A9 95 85 00    store_16_value ZP_PTR_1, test_sprite
-0008AA  2  A9 09 85 01  
-0008AE  2  A0 00          ldy #0
-0008B0  2                 @loop:
-0008B0  2  B1 00            lda (ZP_PTR_1),y
-0008B2  2  8D 23 9F         sta VERA_data0
-0008B5  2  18 A5 00 69      add_16_value ZP_PTR_1 ,1
-0008B9  2  01 85 00 A5  
-0008BD  2  01 69 00 85  
-0008C2  2  A5 01 C9 0A      compare_16_value ZP_PTR_1, (test_sprite + 128), @loop
-0008C6  2  D0 E8 A5 00  
-0008CA  2  C9 15 D0 E2  
-0008CE  2  60             rts
-0008CF  2               
-0008CF  2               
-0008CF  2               load_background:
-0008CF  2  20 5F 08       jsr load_palette
-0008D2  2  20 97 08       jsr load_test_sprite
-0008D5  2  A9 10          lda #$10
-0008D7  2  8D 22 9F       sta VERA_addr_bank
-0008DA  2  A0 00          ldy #0
-0008DC  2                 @yloop:
-0008DC  2  9C 20 9F         stz VERA_addr_low
-0008DF  2  98               tya
-0008E0  2  8D 21 9F         sta VERA_addr_high
-0008E3  2  A2 00            ldx #0
-0008E5  2                   @xloop:
-0008E5  2  A9 00              lda #0
-0008E7  2  8D 23 9F           sta VERA_data0
-0008EA  2  8D 23 9F           sta VERA_data0
-0008ED  2  E8                 inx
-0008EE  2  E0 18              cpx #24
-0008F0  2  D0 F3              bne @xloop
-0008F2  2  C8               iny
-0008F3  2  C0 0F            cpy #15
-0008F5  2  D0 E5            bne @yloop
-0008F7  2  60             rts
-0008F8  2               
-0008F8  2  00           scroll_counter: .byte 0
-0008F9  2               scroll_background_left:
-0008F9  2  EE F8 08       inc scroll_counter
-0008FC  2  AD F8 08       lda scroll_counter
-0008FF  2  C9 1E          cmp #30
-000901  2  D0 19          bne @done
-000903  2  9C F8 08       stz scroll_counter
-000906  2  A9 95          lda #<test_sprite
-000908  2  85 00          sta ZP_PTR_1
-00090A  2  A9 09          lda #>test_sprite
-00090C  2  85 01          sta ZP_PTR_1+1
-00090E  2  A9 08          lda #8
-000910  2  85 22          sta ZP_PTR_2
-000912  2  A9 08          lda #8
-000914  2  85 24          sta ZP_PTR_3
-000916  2  20 26 08       jsr scroll_4bpp_pixel_line_left
-000919  2  20 97 08       jsr load_test_sprite
-00091C  2                 @done:
-00091C  2  60             rts
-00091D  2               
-00091D  1               
-00091D  1               start: ;initialise game states
-00091D  1  78             sei
-00091E  1  20 7E 09       jsr initialise_interupts
-000921  1  20 50 09       jsr initialise_vera
-000924  1  20 2B 09       jsr initialise_game
-000927  1  58             cli
-000928  1  4C 4C 09       jmp main
-00092B  1               
-00092B  1               initialise_game: ;use this for any initial conditions or loading assets in memory on loading the game(e.g. pallets, graphics etc...)
-00092B  1  20 CF 08       jsr load_background ;under background.asm
-00092E  1  60             rts
-00092F  1               
-00092F  1               custom_irq: ;game loop
-00092F  1  AD 27 9F       lda VERA_isr
-000932  1  29 01          and #$01
-000934  1  D0 0A          bne @update
-000936  1  AD 27 9F       lda VERA_isr
-000939  1  29 02          and #$02
-00093B  1  D0 09          bne @line
-00093D  1  4C 49 09       jmp @done
-000940  1                 @update: ;place per frame operations in here
-000940  1  20 F9 08         jsr scroll_background_left ;under background.asm
-000943  1  4C 49 09         jmp @done
-000946  1                 @line: ;place per line operations in here (can be removed if not using line interupts)
-000946  1  4C 49 09         jmp @done
-000949  1                 @done:
-000949  1  6C 10 08       jmp (default_irq_vector)
-00094C  1               
-00094C  1               main: ;loop forever
-00094C  1  CB             wai
-00094D  1  4C 4C 09       jmp main
-000950  1               
-000950  1               initialise_vera:
-000950  1  A9 01          lda #VERA_INTERUPT
-000952  1  8D 26 9F       sta VERA_ien
-000955  1  A9 40          lda #VERA_SCALE
-000957  1  8D 2A 9F       sta VERA_dc_hscale
-00095A  1  8D 2B 9F       sta VERA_dc_vscale
-00095D  1  AD 29 9F       lda VERA_dc_video
-000960  1  09 70          ora #VERA_DC_VIDEO_MASK
-000962  1  8D 29 9F       sta VERA_dc_video
-000965  1  AD 2D 9F       lda VERA_L0_config
-000968  1  09 02          ora #VERA_L0_COLOR_DEPTH_MASK
-00096A  1  8D 2D 9F       sta VERA_L0_config
-00096D  1  AD 34 9F       lda VERA_L1_config
-000970  1  09 02          ora #VERA_L1_COLOR_DEPTH_MASK
-000972  1  8D 34 9F       sta VERA_L1_config
-000975  1  AD 36 9F       lda VERA_L1_tilebase
-000978  1  09 03          ora #$03
-00097A  1  8D 36 9F       sta VERA_L1_tilebase
-00097D  1  60             rts
-00097E  1               
-00097E  1               initialise_interupts: ;overwrite the defaut irq handler vector with a vector to custom irq handler
-00097E  1  AD 14 03       lda IRQVec
-000981  1  8D 10 08       sta default_irq_vector
-000984  1  AD 15 03       lda IRQVec + 1
-000987  1  8D 11 08       sta default_irq_vector + 1
-00098A  1               
-00098A  1  A9 2F          lda #<custom_irq
-00098C  1  8D 14 03       sta IRQVec
-00098F  1  A9 09          lda #>custom_irq
-000991  1  8D 15 03       sta IRQVec + 1
-000994  1  60             rts
-000995  1               
-000995  1               test_sprite:
-000995  1                 .include "test_sprite.inc"
-000995  2               ;test_sprite - size is 128
+000833  3               scroll_tile_left:
+000833  3  A4 24          ldy ZP_PTR_3
+000835  3                 @loop:
+000835  3  5A               phy
+000836  3  20 26 08         jsr scroll_pixel_line_left
+000839  3  A5 22            lda ZP_PTR_2
+00083B  3  18 65 00 85      add_a_to_16_value ZP_PTR_1 ;macro adds a to a 16 value                               ;in this case the pixel line address (we want to jump 8 bytes each loop)
+00083F  3  00 A9 00 65  
+000843  3  01 85 01     
+000846  3  7A               ply
+000847  3  88               dey
+000848  3  D0 EB            bne @loop
+00084A  3  60             rts
+00084B  3               
+00084B  2               
+00084B  2               load_palette:
+00084B  2  A9 11 8D 22    VERA_SET_ADDR $1FA00, 1
+00084F  2  9F A9 FA 8D  
+000853  2  21 9F A9 00  
+00085A  2  A9 05 85 00    store_16_value ZP_PTR_1, palette
+00085E  2  A9 0A 85 01  
+000862  2  A0 00          ldy #0
+000864  2                 @loop:
+000864  2  B1 00            lda (ZP_PTR_1),y
+000866  2  8D 23 9F         sta VERA_data0
+000869  2  18 A5 00 69      add_16_value ZP_PTR_1 ,1
+00086D  2  01 85 00 A5  
+000871  2  01 69 00 85  
+000876  2  A5 01 C9 0A      compare_16_value ZP_PTR_1, (palette + 64), @loop
+00087A  2  D0 E8 A5 00  
+00087E  2  C9 45 D0 E2  
+000882  2  60             rts
+000883  2               
+000883  2               load_test_sprite:
+000883  2  A9 10 8D 22    VERA_SET_ADDR $F800,1
+000887  2  9F A9 F8 8D  
+00088B  2  21 9F A9 00  
+000892  2  A9 85 85 00    store_16_value ZP_PTR_1, test_sprite
+000896  2  A9 09 85 01  
+00089A  2  A0 00          ldy #0
+00089C  2                 @loop:
+00089C  2  B1 00            lda (ZP_PTR_1),y
+00089E  2  8D 23 9F         sta VERA_data0
+0008A1  2  18 A5 00 69      add_16_value ZP_PTR_1 ,1
+0008A5  2  01 85 00 A5  
+0008A9  2  01 69 00 85  
+0008AE  2  A5 01 C9 0A      compare_16_value ZP_PTR_1, (test_sprite + 128), @loop
+0008B2  2  D0 E8 A5 00  
+0008B6  2  C9 05 D0 E2  
+0008BA  2  60             rts
+0008BB  2               
+0008BB  2               
+0008BB  2               load_background:
+0008BB  2  20 4B 08       jsr load_palette
+0008BE  2  20 83 08       jsr load_test_sprite
+0008C1  2  A9 10          lda #$10
+0008C3  2  8D 22 9F       sta VERA_addr_bank
+0008C6  2  A0 00          ldy #0
+0008C8  2                 @yloop:
+0008C8  2  9C 20 9F         stz VERA_addr_low
+0008CB  2  98               tya
+0008CC  2  8D 21 9F         sta VERA_addr_high
+0008CF  2  A2 00            ldx #0
+0008D1  2                   @xloop:
+0008D1  2  A9 00              lda #0
+0008D3  2  8D 23 9F           sta VERA_data0
+0008D6  2  8D 23 9F           sta VERA_data0
+0008D9  2  E8                 inx
+0008DA  2  E0 18              cpx #24
+0008DC  2  D0 F3              bne @xloop
+0008DE  2  C8               iny
+0008DF  2  C0 0F            cpy #15
+0008E1  2  D0 E5            bne @yloop
+0008E3  2  60             rts
+0008E4  2               
+0008E4  2  00           scroll_counter: .byte 0
+0008E5  2               scroll_background_left:
+0008E5  2  EE E4 08       inc scroll_counter
+0008E8  2  AD E4 08       lda scroll_counter
+0008EB  2  C9 02          cmp #2
+0008ED  2  D0 1D          bne @done
+0008EF  2  9C E4 08       stz scroll_counter
+0008F2  2  20 83 08       jsr load_test_sprite
+0008F5  2  A9 85 85 00    _scroll_tile_left test_sprite, 16, 16, 4 ;16x16 tile with each pixel at 4bpp
+0008F9  2  A9 09 85 01  
+0008FD  2  A9 08 85 22  
+00090C  2                 @done:
+00090C  2  60             rts
+00090D  2               
+00090D  1               
+00090D  1               start: ;initialise game states
+00090D  1  78             sei
+00090E  1  20 6E 09       jsr initialise_interupts
+000911  1  20 40 09       jsr initialise_vera
+000914  1  20 1B 09       jsr initialise_game
+000917  1  58             cli
+000918  1  4C 3C 09       jmp main
+00091B  1               
+00091B  1               initialise_game: ;use this for any initial conditions or loading assets in memory on loading the game(e.g. pallets, graphics etc...)
+00091B  1  20 BB 08       jsr load_background ;under background.asm
+00091E  1  60             rts
+00091F  1               
+00091F  1               custom_irq: ;game loop
+00091F  1  AD 27 9F       lda VERA_isr
+000922  1  29 01          and #$01
+000924  1  D0 0A          bne @update
+000926  1  AD 27 9F       lda VERA_isr
+000929  1  29 02          and #$02
+00092B  1  D0 09          bne @line
+00092D  1  4C 39 09       jmp @done
+000930  1                 @update: ;place per frame operations in here
+000930  1  20 E5 08         jsr scroll_background_left ;under background.asm
+000933  1  4C 39 09         jmp @done
+000936  1                 @line: ;place per line operations in here (can be removed if not using line interupts)
+000936  1  4C 39 09         jmp @done
+000939  1                 @done:
+000939  1  6C 10 08       jmp (default_irq_vector)
+00093C  1               
+00093C  1               main: ;loop forever
+00093C  1  CB             wai
+00093D  1  4C 3C 09       jmp main
+000940  1               
+000940  1               initialise_vera:
+000940  1  A9 01          lda #VERA_INTERUPT
+000942  1  8D 26 9F       sta VERA_ien
+000945  1  A9 40          lda #VERA_SCALE
+000947  1  8D 2A 9F       sta VERA_dc_hscale
+00094A  1  8D 2B 9F       sta VERA_dc_vscale
+00094D  1  AD 29 9F       lda VERA_dc_video
+000950  1  09 70          ora #VERA_DC_VIDEO_MASK
+000952  1  8D 29 9F       sta VERA_dc_video
+000955  1  AD 2D 9F       lda VERA_L0_config
+000958  1  09 02          ora #VERA_L0_COLOR_DEPTH_MASK
+00095A  1  8D 2D 9F       sta VERA_L0_config
+00095D  1  AD 34 9F       lda VERA_L1_config
+000960  1  09 02          ora #VERA_L1_COLOR_DEPTH_MASK
+000962  1  8D 34 9F       sta VERA_L1_config
+000965  1  AD 36 9F       lda VERA_L1_tilebase
+000968  1  09 03          ora #$03
+00096A  1  8D 36 9F       sta VERA_L1_tilebase
+00096D  1  60             rts
+00096E  1               
+00096E  1               initialise_interupts: ;overwrite the defaut irq handler vector with a vector to custom irq handler
+00096E  1  AD 14 03       lda IRQVec
+000971  1  8D 10 08       sta default_irq_vector
+000974  1  AD 15 03       lda IRQVec + 1
+000977  1  8D 11 08       sta default_irq_vector + 1
+00097A  1               
+00097A  1  A9 1F          lda #<custom_irq
+00097C  1  8D 14 03       sta IRQVec
+00097F  1  A9 09          lda #>custom_irq
+000981  1  8D 15 03       sta IRQVec + 1
+000984  1  60             rts
+000985  1               
+000985  1               test_sprite:
+000985  1                 .include "test_sprite.inc"
+000985  2               ;test_sprite - size is 128
+000985  2  88 88 88 88  .byte $88,$88,$88,$88,$55,$55,$55,$55
+000989  2  55 55 55 55  
+00098D  2  88 88 88 88  .byte $88,$88,$88,$88,$55,$55,$55,$55
+000991  2  55 55 55 55  
 000995  2  88 88 88 88  .byte $88,$88,$88,$88,$55,$55,$55,$55
 000999  2  55 55 55 55  
-00099D  2  85 55 55 58  .byte $85,$55,$55,$58,$58,$88,$88,$85
-0009A1  2  58 88 88 85  
-0009A5  2  85 88 88 58  .byte $85,$88,$88,$58,$58,$55,$55,$85
-0009A9  2  58 55 55 85  
-0009AD  2  85 85 58 58  .byte $85,$85,$58,$58,$58,$58,$85,$85
-0009B1  2  58 58 85 85  
-0009B5  2  85 85 58 58  .byte $85,$85,$58,$58,$58,$58,$85,$85
-0009B9  2  58 58 85 85  
-0009BD  2  85 88 88 58  .byte $85,$88,$88,$58,$58,$55,$55,$85
-0009C1  2  58 55 55 85  
-0009C5  2  85 55 55 58  .byte $85,$55,$55,$58,$58,$88,$88,$85
-0009C9  2  58 88 88 85  
-0009CD  2  88 88 88 88  .byte $88,$88,$88,$88,$55,$55,$55,$55
-0009D1  2  55 55 55 55  
+00099D  2  88 88 88 88  .byte $88,$88,$88,$88,$55,$55,$55,$55
+0009A1  2  55 55 55 55  
+0009A5  2  88 88 88 88  .byte $88,$88,$88,$88,$55,$55,$55,$55
+0009A9  2  55 55 55 55  
+0009AD  2  88 88 88 88  .byte $88,$88,$88,$88,$55,$55,$55,$55
+0009B1  2  55 55 55 55  
+0009B5  2  88 88 88 88  .byte $88,$88,$88,$88,$55,$55,$55,$55
+0009B9  2  55 55 55 55  
+0009BD  2  88 88 88 88  .byte $88,$88,$88,$88,$55,$55,$55,$55
+0009C1  2  55 55 55 55  
+0009C5  2  55 55 55 55  .byte $55,$55,$55,$55,$88,$88,$88,$88
+0009C9  2  88 88 88 88  
+0009CD  2  55 55 55 55  .byte $55,$55,$55,$55,$88,$88,$88,$88
+0009D1  2  88 88 88 88  
 0009D5  2  55 55 55 55  .byte $55,$55,$55,$55,$88,$88,$88,$88
 0009D9  2  88 88 88 88  
-0009DD  2  58 88 88 85  .byte $58,$88,$88,$85,$85,$55,$55,$58
-0009E1  2  85 55 55 58  
-0009E5  2  58 55 55 85  .byte $58,$55,$55,$85,$85,$88,$88,$58
-0009E9  2  85 88 88 58  
-0009ED  2  58 58 85 85  .byte $58,$58,$85,$85,$85,$85,$58,$58
-0009F1  2  85 85 58 58  
-0009F5  2  58 58 85 85  .byte $58,$58,$85,$85,$85,$85,$58,$58
-0009F9  2  85 85 58 58  
-0009FD  2  58 55 55 85  .byte $58,$55,$55,$85,$85,$88,$88,$58
-000A01  2  85 88 88 58  
-000A05  2  58 88 88 85  .byte $58,$88,$88,$85,$85,$55,$55,$58
-000A09  2  85 55 55 58  
-000A0D  2  55 55 55 55  .byte $55,$55,$55,$55,$88,$88,$88,$88
-000A11  2  88 88 88 88  
-000A15  2               
-000A15  1               palette:
-000A15  1                 .include "palette.inc"
-000A15  2               ;palette_1 - size is 64
-000A15  2  00 00 23 02  .byte $00,$00,$23,$02,$23,$04,$33,$06
-000A19  2  23 04 33 06  
-000A1D  2  53 08 72 0D  .byte $53,$08,$72,$0D,$A6,$0D,$C9,$0E
-000A21  2  A6 0D C9 0E  
-000A25  2  F3 0F E5 09  .byte $F3,$0F,$E5,$09,$B3,$06,$96,$03
-000A29  2  B3 06 96 03  
-000A2D  2  62 04 42 05  .byte $62,$04,$42,$05,$33,$03,$37,$03
-000A31  2  33 03 37 03  
-000A35  2  68 03 6E 05  .byte $68,$03,$6E,$05,$9F,$06,$CE,$05
-000A39  2  9F 06 CE 05  
-000A3D  2  DF 0C FF 0F  .byte $DF,$0C,$FF,$0F,$AB,$09,$78,$08
-000A41  2  AB 09 78 08  
-000A45  2  66 06 55 05  .byte $66,$06,$55,$05,$48,$07,$33,$0A
-000A49  2  48 07 33 0A  
-000A4D  2  56 0D 7B 0D  .byte $56,$0D,$7B,$0D,$94,$08,$63,$08
-000A51  2  94 08 63 08  
-000A55  2               
-000A55  1               
+0009DD  2  55 55 55 55  .byte $55,$55,$55,$55,$88,$88,$88,$88
+0009E1  2  88 88 88 88  
+0009E5  2  55 55 55 55  .byte $55,$55,$55,$55,$88,$88,$88,$88
+0009E9  2  88 88 88 88  
+0009ED  2  55 55 55 55  .byte $55,$55,$55,$55,$88,$88,$88,$88
+0009F1  2  88 88 88 88  
+0009F5  2  55 55 55 55  .byte $55,$55,$55,$55,$88,$88,$88,$88
+0009F9  2  88 88 88 88  
+0009FD  2  55 55 55 55  .byte $55,$55,$55,$55,$88,$88,$88,$88
+000A01  2  88 88 88 88  
+000A05  2               
+000A05  1               palette:
+000A05  1                 .include "palette.inc"
+000A05  2               ;palette_1 - size is 64
+000A05  2  00 00 23 02  .byte $00,$00,$23,$02,$23,$04,$33,$06
+000A09  2  23 04 33 06  
+000A0D  2  53 08 72 0D  .byte $53,$08,$72,$0D,$A6,$0D,$C9,$0E
+000A11  2  A6 0D C9 0E  
+000A15  2  F3 0F E5 09  .byte $F3,$0F,$E5,$09,$B3,$06,$96,$03
+000A19  2  B3 06 96 03  
+000A1D  2  62 04 42 05  .byte $62,$04,$42,$05,$33,$03,$37,$03
+000A21  2  33 03 37 03  
+000A25  2  68 03 6E 05  .byte $68,$03,$6E,$05,$9F,$06,$CE,$05
+000A29  2  9F 06 CE 05  
+000A2D  2  DF 0C FF 0F  .byte $DF,$0C,$FF,$0F,$AB,$09,$78,$08
+000A31  2  AB 09 78 08  
+000A35  2  66 06 55 05  .byte $66,$06,$55,$05,$48,$07,$33,$0A
+000A39  2  48 07 33 0A  
+000A3D  2  56 0D 7B 0D  .byte $56,$0D,$7B,$0D,$94,$08,$63,$08
+000A41  2  94 08 63 08  
+000A45  2               
+000A45  1               

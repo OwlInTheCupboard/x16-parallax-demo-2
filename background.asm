@@ -50,18 +50,10 @@ scroll_counter: .byte 0
 scroll_background_left:
   inc scroll_counter
   lda scroll_counter
-  cmp #30
+  cmp #2
   bne @done
   stz scroll_counter
-  lda #<test_sprite
-  sta ZP_PTR_1
-  lda #>test_sprite
-  sta ZP_PTR_1+1
-  lda #8
-  sta ZP_PTR_2
-  lda #8
-  sta ZP_PTR_3
-  jsr scroll_4bpp_pixel_line_left
   jsr load_test_sprite
+  _scroll_tile_left test_sprite, 16, 16, 4 ;16x16 tile with each pixel at 4bpp
   @done:
   rts
